@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<!-- saved from url=(0065)file:///C:/Users/felipemed/Downloads/everything_start_here_1.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>everything start here</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com/">
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+  <link href="./everything start here_files/css2" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --green: #abf895;
+      --black: #000;
+      --white: #fff;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--black);
+      overflow: hidden;
+    }
+
+    /* Outer container: always fills viewport, clips overflow */
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Inner canvas: fixed 1280×720 design, scaled to fit viewport */
+    #canvas {
+      position: relative;
+      width: 1280px;
+      height: 720px;
+      background: var(--green);
+      transform-origin: center center;
+      flex-shrink: 0;
+    }
+
+    /* ── Top text ─────────────────────────────────────────── */
+    #top-label {
+      position: absolute;
+      top: 32px;
+      left: 36px;
+      right: 36px;
+      font-family: 'Geist Mono', monospace;
+      font-weight: 300;
+      font-size: 18px;
+      line-height: 1.6;
+      color: var(--black);
+    }
+
+    #top-label em {
+      font-style: normal;
+      font-family: 'Geist Mono', monospace;
+      font-weight: 500;
+      background: var(--black);
+      color: var(--white);
+      padding: 0 4px;
+    }
+
+    /* ── Main words ───────────────────────────────────────── */
+    #words-container {
+      position: absolute;
+      /* vertically centered in the canvas, text baseline ~302px from top */
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .word {
+      position: absolute;
+      font-family: 'Geist', sans-serif;
+      font-weight: 600;
+      font-size: 80px;
+      color: var(--black);
+      white-space: nowrap;
+      /* GPU-composited transition — only transform */
+      transition: transform 0.72s cubic-bezier(0.77, 0, 0.18, 1);
+      will-change: transform;
+      /* each word anchored to its "home" top-left corner */
+    }
+
+    /* ── Button ───────────────────────────────────────────── */
+    #btn {
+      position: absolute;
+      left: 50%;
+      bottom: 117px; /* 720 - 542 - 49 ≈ 129, center at 542 */
+      transform: translateX(-50%);
+      width: 98.78px;
+      height: 98.78px;
+      border-radius: 50%;
+      background: var(--black);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.18s ease;
+    }
+
+    #btn:hover {
+      transform: translateX(-50%) scale(1.08);
+    }
+
+    #btn:active {
+      transform: translateX(-50%) scale(0.94);
+    }
+
+    #btn span {
+      font-family: 'Geist', sans-serif;
+      font-weight: 400;
+      font-size: 46px;
+      color: var(--green);
+      user-select: none;
+      letter-spacing: -0.01em;
+    }
+  </style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="canvas" style="transform: scale(0.940625);">
+
+    <!-- Top text -->
+    <div id="top-label">
+      <em>"Everything Starts Here"</em> is a poetic–graphic artifact that explores the many ways of beginning, grounded in a
+      single condition: the act of trying. New possibilities arise through reconfiguration—shared elements, diverse
+      approaches, multiple perspectives—revealing what transforms and what endures through a simple action.
+    </div>
+
+    <!-- Words -->
+    <div id="words-container">
+      <span class="word" id="w0" style="top: 0px; left: 0px; transform: translate(234.568px, 222px); transition: transform 0.72s cubic-bezier(0.77, 0, 0.18, 1);">everything</span>
+      <span class="word" id="w1" style="top: 0px; left: 0px; transform: translate(667.214px, 222px); transition: transform 0.72s cubic-bezier(0.77, 0, 0.18, 1);">start</span>
+      <span class="word" id="w2" style="top: 0px; left: 0px; transform: translate(875.089px, 222px); transition: transform 0.72s cubic-bezier(0.77, 0, 0.18, 1);">here</span>
+    </div>
+
+    <!-- Button -->
+    <button id="btn"><span>try</span></button>
+
+  </div>
+</div>
+
+<script>
+  // ── Constants ──────────────────────────────────────────────────────────────
+  const WORDS = ["everything", "start", "here"];
+
+  // All 6 permutations as index arrays [w0, w1, w2]
+  const PERMS = [
+    [0, 1, 2], // EVERYTHING START HERE
+    [0, 2, 1], // EVERYTHING HERE START
+    [1, 0, 2], // START EVERYTHING HERE
+    [1, 2, 0], // START HERE EVERYTHING
+    [2, 0, 1], // HERE EVERYTHING START
+    [2, 1, 0], // HERE START EVERYTHING
+  ];
+
+  // Canvas reference size
+  const CW = 1280, CH = 720;
+
+  // Measured approximate widths at 80px Geist SemiBold (tweak if needed)
+  // We'll compute them dynamically after first render.
+  const GAP = 22; // horizontal gap between words
+  const BASELINE_Y = 302; // same as SVG (translateY in transform)
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let currentPermIdx = 0;   // index into PERMS currently shown
+  let wordWidths = null;     // measured widths [w0, w1, w2] in canvas px
+  let isAnimating = false;
+
+  // ── Elements ──────────────────────────────────────────────────────────────
+  const stage   = document.getElementById('stage');
+  const canvas  = document.getElementById('canvas');
+  const elWords = [
+    document.getElementById('w0'),
+    document.getElementById('w1'),
+    document.getElementById('w2'),
+  ];
+  const btn = document.getElementById('btn');
+
+  // ── Scaling ───────────────────────────────────────────────────────────────
+  function scaleCanvas() {
+    const scaleX = window.innerWidth  / CW;
+    const scaleY = window.innerHeight / CH;
+    const scale  = Math.min(scaleX, scaleY);
+    canvas.style.transform = `scale(${scale})`;
+  }
+
+  window.addEventListener('resize', scaleCanvas);
+  scaleCanvas();
+
+  // ── Word measurement ──────────────────────────────────────────────────────
+  function measureWords() {
+    wordWidths = elWords.map(el => el.getBoundingClientRect().width / currentScale());
+  }
+
+  function currentScale() {
+    const scaleX = window.innerWidth  / CW;
+    const scaleY = window.innerHeight / CH;
+    return Math.min(scaleX, scaleY);
+  }
+
+  // ── Layout ────────────────────────────────────────────────────────────────
+  // Given a permutation (array of 3 word indices), compute x positions
+  // for each word slot. The full row is centered horizontally.
+  function computeLayout(perm) {
+    if (!wordWidths) return null;
+
+    // widths in visual order dictated by perm
+    const orderedWidths = perm.map(wi => wordWidths[wi]);
+    const totalWidth = orderedWidths.reduce((a, b) => a + b, 0) + GAP * 2;
+    const startX = (CW - totalWidth) / 2;
+
+    // x for each slot in visual order
+    const slotX = [];
+    let x = startX;
+    for (let i = 0; i < 3; i++) {
+      slotX.push(x);
+      x += orderedWidths[i] + GAP;
+    }
+
+    // Map: for each word id wi, which slot x does it go to?
+    // perm[slot] = wi  →  word wi goes to slot position slotX[slot]
+    const positions = {}; // wi → { x, y }
+    perm.forEach((wi, slot) => {
+      positions[wi] = { x: slotX[slot], y: BASELINE_Y - 80 };
+    });
+
+    return positions;
+  }
+
+  // Apply positions via CSS transform (GPU composited)
+  function applyLayout(positions) {
+    for (let wi = 0; wi < 3; wi++) {
+      const { x, y } = positions[wi];
+      elWords[wi].style.transform = `translate(${x}px, ${y}px)`;
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  function init() {
+    // Place words at absolute (0,0); we'll move them via transform
+    elWords.forEach((el, i) => {
+      el.textContent = WORDS[i];
+      el.style.top  = '0';
+      el.style.left = '0';
+      el.style.transform = 'translate(0,0)';
+    });
+
+    // Disable transition for first placement
+    elWords.forEach(el => el.style.transition = 'none');
+
+    requestAnimationFrame(() => {
+      measureWords();
+      const pos = computeLayout(PERMS[currentPermIdx]);
+      if (pos) applyLayout(pos);
+
+      // Re-enable transition next frame
+      requestAnimationFrame(() => {
+        elWords.forEach(el => el.style.transition = 'transform 0.72s cubic-bezier(0.77, 0, 0.18, 1)');
+      });
+    });
+  }
+
+  // ── Button ────────────────────────────────────────────────────────────────
+  btn.addEventListener('click', () => {
+    if (isAnimating) return;
+
+    // Pick a random permutation ≠ current
+    const others = PERMS.map((_, i) => i).filter(i => i !== currentPermIdx);
+    const nextIdx = others[Math.floor(Math.random() * others.length)];
+    currentPermIdx = nextIdx;
+
+    isAnimating = true;
+    const pos = computeLayout(PERMS[currentPermIdx]);
+    if (pos) applyLayout(pos);
+
+    setTimeout(() => { isAnimating = false; }, 750);
+  });
+
+  // ── Start ─────────────────────────────────────────────────────────────────
+  // Wait for fonts to load before measuring
+  document.fonts.ready.then(init);
+</script>
+
+
+</body></html>
